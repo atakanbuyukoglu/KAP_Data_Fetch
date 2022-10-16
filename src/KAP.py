@@ -3,6 +3,7 @@ import json
 from pathlib import Path
 from bs4 import BeautifulSoup
 import os
+import re
 
 class KAP():
 
@@ -49,17 +50,34 @@ class KAP():
         company_dict = {}
         for idx, company in enumerate(resp_filter):
             ticker_dict = {}
+
             ticker = company.select('div.comp-cell._04.vtable a.vcell')[0].text
-            link = company.select('div.comp-cell._04.vtable a.vcell[href]')[0]['href']
-            
             ticker_dict['ticker'] = ticker
+            name = company.select('div.comp-cell._14.vtable a.vcell')[0].text
+            ticker_dict['name'] = name
+            link = company.select('div.comp-cell._04.vtable a.vcell[href]')[0]['href']
             ticker_dict['link'] = constants['sites']['main_site'] + link
+            auditor = company.select('div.comp-cell._11.vtable a.vcell')[0].text
+            ticker_dict['auditor'] = auditor
+            city = company.select('div.comp-cell._12.vtable div.vcell')[0].text
+            ticker_dict['city'] = city
+            kap_id = int(re.search(r'\d+', link).group())
+            ticker_dict['kap_id'] = kap_id
+            if idx==0:
+                resp = r.get(url=ticker_dict['link'])
+                soup = BeautifulSoup(resp.text, 'html.parser')
+                mkk_id = soup.select('img.comp-logo')[0]['src'].split('/')[-1]
+                ticker_dict['mkk_id'] = mkk_id
+
             company_dict[ticker] = ticker_dict
 
         # Save the temp results for testing
-        temp_path = resp_html_path.parent / 'Temp.html'
+        temp_path = resp_html_path.parent / 'Dict_Sample.json'
         with open(temp_path, 'w+', encoding='utf-8') as f:
-            f.write(str(company_dict['AVOD']))
+            json.dump(company_dict['AVOD'], f, ensure_ascii=False)
+        temp_path = resp_html_path.parent / 'HTML_Sample.html'
+        with open(temp_path, 'w+', encoding='utf-8') as f:
+            f.write(str(resp_filter[0]))
 
         return type(company_dict['AVOD'])
 
