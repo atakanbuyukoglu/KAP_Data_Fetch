@@ -1,0 +1,8 @@
+name: kap
+
+dependencies:
+  - python=3.8
+  - requests=2.27
+  - json
+  - pathlib
+  - beautifulsoup4
