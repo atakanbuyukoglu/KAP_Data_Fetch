@@ -1,20 +1,28 @@
-from KAP import KAP
+from .KAP import KAP
 
 # TODO: Start with the company class
 # TODO: Add fetcher for the MKK ID.
 
 class Company():
 
-    def __init__(self) -> None:
-        self.mkk_id = None
+    def __init__(self, ticker: str) -> None:
+        self.ticker = ticker
         self.kap_website = KAP()
 
-    # TODO: Get company info from KAP
-    def update_info(self):
-        pass
+        self.company_info = self.update_info()
 
-    def get_mkk_id(self):
-        if self.mkk_id:
-            return self.mkk_id
-        self.update_info()
-        return self.mkk_id
+
+    # TODO: Get company info from KAP
+    def update_info(self, online=False):
+        company_dict = self.kap_website.get_company(ticker=self.ticker, online=online)
+        return company_dict
+
+    def __getattr__(self, name):
+        company_info =  object.__getattribute__(self, "company_info")
+        if name in company_info:
+            return company_info[name]
+        else:
+            # Fails if the attribute is not found
+            # TODO: Add default value or throw KeyError
+            company_info = self.update_info(online=True)
+            return company_info[name]
