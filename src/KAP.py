@@ -51,7 +51,7 @@ class KAP():
         return html_list
 
     @staticmethod
-    def __html_list_to_company_dict(html_list):
+    def __html_list_to_company_dict(html_list, mkk=False, mkk_ticker:str=""):
         constants_path = Path(__file__).parents[1] / 'Config' / 'Constants.json'
         # Load the constants
         with open(constants_path, 'r') as f:
@@ -73,7 +73,7 @@ class KAP():
             ticker_dict['city'] = city
             kap_id = int(re.search(r'\d+', link).group())
             ticker_dict['kap_id'] = kap_id
-            if idx==0:
+            if mkk and mkk_ticker==ticker:
                 resp = r.get(url=ticker_dict['link'])
                 soup = BeautifulSoup(resp.text, 'html.parser')
                 mkk_id = soup.select('img.comp-logo')[0]['src'].split('/')[-1]
@@ -84,13 +84,13 @@ class KAP():
         return company_dict
 
     
-    def get_company(self, ticker: str, online=False, save_results=False):
-        companies = self.get_companies(online=online, save_results=save_results)
+    def get_company(self, ticker: str, online=False, mkk=False, save_results=False):
+        companies = self.get_companies(online=online, mkk=mkk, save_results=save_results, mkk_ticker=ticker)
         company_dict = companies[ticker]
         return company_dict
 
     
-    def get_companies(self, online=False, save_results=False):
+    def get_companies(self, online=False, mkk=False, save_results=False, mkk_ticker=""):
         
         resp_html_path = Path(__file__).parents[1] / 'Data' / 'Company_List.html'
 
@@ -100,7 +100,7 @@ class KAP():
         html_list = KAP.__raw_html_to_html_list(raw_response)
         
         # Convert the results to a dictionary
-        company_dict = KAP.__html_list_to_company_dict(html_list)
+        company_dict = KAP.__html_list_to_company_dict(html_list, mkk=mkk, mkk_ticker=mkk_ticker)
 
         # Save the temp results for testing
         if save_results:
