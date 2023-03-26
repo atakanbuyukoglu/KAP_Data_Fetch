@@ -21,16 +21,7 @@ class KAP():
 
         # Initialize Request wrapper with sleep time
         self.r = Request(sleep_time=self.constants['sleep_times']['kap'])
-        # Initialize Yahoo sleep time variables
-        self.yahoo_sleep_time = self.constants['sleep_times']['yahoo']
-        self.yahoo_last_request = 0.0
-
-    def __yahoo_request_sleep(self):
-        # If the request is too new, sleep until enough time has passed
-        rem_sleep_time = self.yahoo_sleep_time - (time.time() - self.yahoo_last_request)
-        if rem_sleep_time > 0:
-            time.sleep(rem_sleep_time)
-        self.yahoo_last_request = time.time()
+        self.r_yahoo = Request(sleep_time=self.constants['sleep_times']['yahoo'])
 
     def __get_company_list_html(self):
 
@@ -119,9 +110,10 @@ class KAP():
 
     def get_price(self, ticker:str):
         query_ticker = ticker + '.' + 'IS'
-        yahoo_scraper = yf.Ticker(query_ticker)
-        self.__yahoo_request_sleep()
-        return np.round(yahoo_scraper.fast_info['lastPrice'], decimals=2)
+        yahoo_scraper = yf.Ticker(query_ticker, session=self.r_yahoo)
+        info = yahoo_scraper.fast_info
+        print(dict(info))
+        return np.round(info['lastPrice'], decimals=2)
 
     def get_companies(self, online=False, save_results=True):
 
@@ -148,4 +140,7 @@ class KAP():
         
         self.companies = company_dict
         return company_dict
-  
+    
+    # TODO: Find a way to add Yahoo Finance data without affecting offline data loading
+    def __add_yahoo_data(self):
+        pass
