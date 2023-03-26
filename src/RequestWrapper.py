@@ -21,4 +21,5 @@ class Request(r.Session):
             time.sleep(rem_sleep_time)
         # Make the request
         result = super(Request, self).get(url, **kwargs)
+        self.last_request = time.time()
         return result

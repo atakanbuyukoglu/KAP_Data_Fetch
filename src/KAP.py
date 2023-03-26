@@ -5,17 +5,32 @@ from bs4 import BeautifulSoup
 import re
 import yfinance as yf
 import numpy as np
+import time
 
 class KAP():
 
     def __init__(self) -> None:
         self.constants_path = Path(__file__).parents[1] / 'Config' / 'Constants.json'
+        # Load the constants
+        with open(self.constants_path, 'r') as f:
+            self.constants = json.load(f)
         self.data_path = Path(__file__).parents[1] / 'Data'
         self.companies = None
 
         self.query_suffix = '.IS'
 
-        self.r = Request(sleep_time=5.0)
+        # Initialize Request wrapper with sleep time
+        self.r = Request(sleep_time=self.constants['sleep_times']['kap'])
+        # Initialize Yahoo sleep time variables
+        self.yahoo_sleep_time = self.constants['sleep_times']['yahoo']
+        self.yahoo_last_request = 0.0
+
+    def __yahoo_request_sleep(self):
+        # If the request is too new, sleep until enough time has passed
+        rem_sleep_time = self.yahoo_sleep_time - (time.time() - self.yahoo_last_request)
+        if rem_sleep_time > 0:
+            time.sleep(rem_sleep_time)
+        self.yahoo_last_request = time.time()
 
     def __get_company_list_html(self):
 
@@ -105,6 +120,7 @@ class KAP():
     def get_price(self, ticker:str):
         query_ticker = ticker + '.' + 'IS'
         yahoo_scraper = yf.Ticker(query_ticker)
+        self.__yahoo_request_sleep()
         return np.round(yahoo_scraper.fast_info['lastPrice'], decimals=2)
 
     def get_companies(self, online=False, save_results=True):
