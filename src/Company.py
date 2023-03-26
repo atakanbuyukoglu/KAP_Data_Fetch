@@ -1,39 +1,38 @@
 from .KAP import KAP
 import yfinance as yf
+import numpy as np
 
 
 class Company():
 
     def __init__(self, ticker: str) -> None:
-        self.ticker = ticker
+        self.ticker = ticker.upper()
+
+        # Initialize the info for the KAP website
         self.kap_website = KAP()
+        self.company_info = self.update_info(online=False)
 
-        self.company_info = self.update_info()
+    def update_info(self, online=True):
+        # Update the info on the KAP database
+        self.kap_website.update_companies(online=online)
+        self.kap_website.add_mkk_id(ticker=self.ticker)
+        company_info = self.kap_website.get_companies()[self.ticker]
 
-        self.query_ticker = self.ticker + '.' + 'IS'
-        self.yahoo_scraper = yf.Ticker(self.query_ticker)
-
-    def update_info(self, online=False, mkk=False):
-        company_dict = self.kap_website.get_company(ticker=self.ticker, online=online, mkk=mkk)
-        return company_dict
+        # Return the company info
+        return company_info
     
     def get_price(self):
-        return self.yahoo_scraper.fast_info['lastPrice']
+        return self.kap_website.get_price(self.ticker)
         
-
+    # Get attributes from company_dict
     def __getattr__(self, name):
         company_info =  object.__getattribute__(self, "company_info")
-        if name in company_info:
+        try:
             return company_info[name]
-        # Fails if the attribute is not found
-        # Check for mkk_id
-        if name == 'mkk_id':
-            company_info = self.update_info(mkk=True)
-            if name in company_info:
-                return company_info[name]
-        # Try one last online update if nothing works
-        company_info = self.update_info(online=True)
-        if name in company_info:
+        except KeyError:
+            company_info = self.update_info()
+        try:
             return company_info[name]
-        else:
-            raise KeyError('Name', name, 'is not an attribute of the company', self.ticker)
+        except KeyError as e:
+            print('No attribute with', name, 'in company', company_info['ticker'], 'found.')
+            raise e

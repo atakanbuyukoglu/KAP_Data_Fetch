@@ -1,6 +1,6 @@
 {
     "sites": {
         "main_site": "https://www.kap.org.tr",
-        "company_list": "https://www.kap.org.tr/tr/bist-sirketler",
+        "company_list": "https://www.kap.org.tr/tr/bist-sirketler"
     }
 }

@@ -1,64 +1,58 @@
-import requests as r
+from .RequestWrapper import Request
 import json
 from pathlib import Path
 from bs4 import BeautifulSoup
-import os
 import re
+import yfinance as yf
+import numpy as np
 
 class KAP():
 
     def __init__(self) -> None:
-        pass
+        self.constants_path = Path(__file__).parents[1] / 'Config' / 'Constants.json'
+        self.data_path = Path(__file__).parents[1] / 'Data'
+        self.companies = None
 
-    def get_company_list_html(self, online=False):
-        constants_path = Path(__file__).parents[1] / 'Config' / 'Constants.json'
-        resp_html_path = Path(__file__).parents[1] / 'Data' / 'Company_List.html'
+        self.query_suffix = '.IS'
+
+        self.r = Request(sleep_time=5.0)
+
+    def __get_company_list_html(self):
 
         # Load the constants
-        with open(constants_path, 'r') as f:
+        with open(self.constants_path, 'r') as f:
             constants = json.load(f)
-
-        # Check if the data is available
-        if not online:
-            data_available = resp_html_path.is_file()
-            data_available = data_available and os.path.getsize(resp_html_path) > 0
-            if data_available:
-                with open(resp_html_path, 'r') as f:
-                    raw_response = f.read()
-        else:
-            # Get the site
-            company_list_site = constants['sites']['company_list']
-            
-            # Fetch the data from the site
-            raw_response = r.get(company_list_site)
-            # Check the status code
-            raw_response.raise_for_status()
-
-            # String for compatibility with offline version
-            raw_response = raw_response.text
-
-            # Save the HTML results to a log file
-            with open(resp_html_path, 'w+', encoding='utf-8') as f:
-                f.write(raw_response)
         
+        # Get the site
+        company_list_site = constants['sites']['company_list']
+        
+        # Fetch the data from the site
+        raw_response = self.r.get(company_list_site)
+        # Check the status code
+        raw_response.raise_for_status()
+
+        # String for compatibility with offline version
+        raw_response = raw_response.text
+
+        # Save the HTML results to a log file
+        with open(self.data_path / 'Company_List.html', 'w', encoding='utf-8') as f:
+            f.write(raw_response)
+    
         return raw_response
 
-    @staticmethod
-    def __raw_html_to_html_list(raw_html):
+    def __raw_html_to_html_list(self, raw_html):
         soup = BeautifulSoup(raw_html, 'html.parser')
         html_list = soup.find_all('div', 'w-clearfix w-inline-block comp-row')
 
         return html_list
 
-    @staticmethod
-    def __html_list_to_company_dict(html_list, mkk=False, mkk_ticker:str=""):
-        constants_path = Path(__file__).parents[1] / 'Config' / 'Constants.json'
+    def __html_list_to_company_dict(self, html_list, save_results=True):
         # Load the constants
-        with open(constants_path, 'r') as f:
+        with open(self.constants_path, 'r') as f:
             constants = json.load(f)
 
         company_dict = {}
-        for idx, company in enumerate(html_list):
+        for company in html_list:
             ticker_dict = {}
 
             ticker = company.select('div.comp-cell._04.vtable a.vcell')[0].text
@@ -73,44 +67,69 @@ class KAP():
             ticker_dict['city'] = city
             kap_id = int(re.search(r'\d+', link).group())
             ticker_dict['kap_id'] = kap_id
-            if mkk and mkk_ticker==ticker:
-                resp = r.get(url=ticker_dict['link'])
-                soup = BeautifulSoup(resp.text, 'html.parser')
-                mkk_id = soup.select('img.comp-logo')[0]['src'].split('/')[-1]
-                ticker_dict['mkk_id'] = mkk_id
 
             company_dict[ticker] = ticker_dict
         
-        return company_dict
-
-    
-    def get_company(self, ticker: str, online=False, mkk=False, save_results=False):
-        companies = self.get_companies(online=online, mkk=mkk, save_results=save_results, mkk_ticker=ticker)
-        company_dict = companies[ticker]
-        return company_dict
-
-    
-    def get_companies(self, online=False, mkk=False, save_results=False, mkk_ticker=""):
-        
-        resp_html_path = Path(__file__).parents[1] / 'Data' / 'Company_List.html'
-
-        raw_response = self.get_company_list_html(online=online)
-
-        # Filter the results
-        html_list = KAP.__raw_html_to_html_list(raw_response)
-        
-        # Convert the results to a dictionary
-        company_dict = KAP.__html_list_to_company_dict(html_list, mkk=mkk, mkk_ticker=mkk_ticker)
-
-        # Save the temp results for testing
         if save_results:
-            temp_path = resp_html_path.parent / 'Dict_Sample.json'
-            with open(temp_path, 'w+', encoding='utf-8') as f:
-                json.dump(company_dict['AVOD'], f, ensure_ascii=False)
-            temp_path = resp_html_path.parent / 'HTML_Sample.html'
-            with open(temp_path, 'w+', encoding='utf-8') as f:
-                f.write(str(html_list[0]))
+            self.save_companies(company_dict)
 
         return company_dict
 
+    def save_companies(self, company_dict):
+        with open(self.data_path / 'Companies.json', 'w', encoding='utf-8') as f:
+            json.dump(company_dict, f, ensure_ascii=False, indent=2)
+    
+    def update_companies(self, online=True):
+        return self.get_companies(online=online)
+
+    def add_mkk_id(self, ticker:str):
+        companies = self.get_companies()
+        # Try accessing the ticker
+        try:
+            company_info = companies[ticker]
+        except KeyError as e:
+            print("Ticker", ticker, "could not be found in the companies list.")
+            print("Try updating the list or checking your ticker input.")
+            raise e
+        # Try returning the MKK ID if it already exists
+        try:
+            return company_info['mkk_id']
+        # Get the MKK ID from the KAP website instead
+        except KeyError:            
+            resp = self.r.get(url=company_info['link'])
+            soup = BeautifulSoup(resp.text, 'html.parser')
+            mkk_id = soup.select('img.comp-logo')[0]['src'].split('/')[-1]
+            company_info['mkk_id'] = mkk_id
+            self.save_companies(companies)
+
+    def get_price(self, ticker:str):
+        query_ticker = ticker + '.' + 'IS'
+        yahoo_scraper = yf.Ticker(query_ticker)
+        return np.round(yahoo_scraper.fast_info['lastPrice'], decimals=2)
+
+    def get_companies(self, online=False, save_results=True):
+
+        if online:
+            # Get the raw HTML response from KAP
+            raw_response = self.__get_company_list_html()
+
+            # Filter the results to companies
+            html_list = self.__raw_html_to_html_list(raw_response)
+            
+            # Convert the results to a dictionary
+            company_dict = self.__html_list_to_company_dict(html_list, save_results=save_results)
+        else:
+            # Get it from the saved varible if possible
+            if self.companies is not None:
+                return self.companies
+            # Try loading them from the saved file
+            try:
+                with open(self.data_path / 'Companies.json', 'r', encoding='utf-8') as f:
+                    company_dict = json.load(f)
+            # If the file is not there, obtain it online
+            except FileNotFoundError:
+                return self.get_companies(online=True, save_results=save_results)
         
+        self.companies = company_dict
+        return company_dict
+  
