@@ -1,11 +1,12 @@
 from .RequestWrapper import Request
+from .DataQuery import YahooSession
 import json
 from pathlib import Path
 from bs4 import BeautifulSoup
 import re
-import yfinance as yf
 import numpy as np
 import time
+import pandas as pd
 
 class KAP():
 
@@ -17,11 +18,12 @@ class KAP():
         self.data_path = Path(__file__).parents[1] / 'Data'
         self.companies = None
 
+        # Yahoo Finance variables
         self.query_suffix = '.IS'
+        self.yahoo_session = YahooSession(sleep_time=self.constants['sleep_times']['yahoo'])
 
         # Initialize Request wrapper with sleep time
         self.r = Request(sleep_time=self.constants['sleep_times']['kap'])
-        self.r_yahoo = Request(sleep_time=self.constants['sleep_times']['yahoo'])
 
     def __get_company_list_html(self):
 
@@ -109,11 +111,8 @@ class KAP():
             self.save_companies(companies)
 
     def get_price(self, ticker:str):
-        query_ticker = ticker + '.' + 'IS'
-        yahoo_scraper = yf.Ticker(query_ticker, session=self.r_yahoo)
-        info = yahoo_scraper.fast_info
-        print(dict(info))
-        return np.round(info['lastPrice'], decimals=2)
+        query_ticker = ticker + self.query_suffix
+        return self.yahoo_session.get_live_price(query_ticker)
 
     def get_companies(self, online=False, save_results=True):
 
