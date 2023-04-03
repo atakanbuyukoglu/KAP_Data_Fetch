@@ -91,8 +91,10 @@ class YahooSession(requests.Session):
         frame = pd.DataFrame(data["chart"]["result"][0]["indicators"]["quote"][0])
 
         # add in adjclose
-        frame["adjclose"] = data["chart"]["result"][0]["indicators"]["adjclose"][0]["adjclose"]
-
+        try:
+            frame["adjclose"] = data["chart"]["result"][0]["indicators"]["adjclose"][0]["adjclose"]
+        except KeyError:
+            frame["adjclose"] = frame["close"]
         # get the date info
         temp_time = data["chart"]["result"][0]["timestamp"]
 
@@ -235,11 +237,11 @@ class YahooSession(requests.Session):
         table = tables[0]
         table = pd.concat(tables)
 
-        table.columns = ["Attribute", "Value"]
+        stats_dict = {}
+        for _, s in table.iterrows():
+            stats_dict[s[0]] = s[1]
 
-        table = table.reset_index(drop=True)
-
-        return table
+        return stats_dict
 
     def get_stats_valuation(self, ticker):
         """Scrapes Valuation Measures table from the statistics tab on Yahoo Finance
@@ -541,12 +543,13 @@ class YahooSession(requests.Session):
         # Get the closest business day as starting time (prevents errors on weekends)
         now = pd.Timestamp.today()
         closest_bday = now
-        if now.weekday() > 4:
-            closest_bday -= pd.Timedelta(days=now.weekday() - 4)
         # If it is before market open, get data from the day before
         # FIXME: Adapt to different market opening hours
         if now.hour < 9:
             closest_bday -= pd.Timedelta(days=1)
+        # Subtract weekends
+        if closest_bday.weekday() > 4:
+            closest_bday -= pd.Timedelta(days=closest_bday.weekday() - 4)
         
 
         # Make the data request

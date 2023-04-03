@@ -83,22 +83,20 @@ class KAP():
 
         return company_dict
 
-    def save_companies(self, company_dict):
+    def save_companies(self, companies):
         with open(self.data_path / 'Companies.json', 'w', encoding='utf-8') as f:
-            json.dump(company_dict, f, ensure_ascii=False, indent=2)
+            json.dump(companies, f, ensure_ascii=False, indent=2)
     
+    def save_company(self, company_dict):
+        companies = self.get_companies()
+        companies[company_dict['ticker']] = company_dict
+        self.save_companies(companies)
+
     def update_companies(self, online=True):
         return self.get_companies(online=online)
 
     def add_mkk_id(self, ticker:str):
-        companies = self.get_companies()
-        # Try accessing the ticker
-        try:
-            company_info = companies[ticker]
-        except KeyError as e:
-            print("Ticker", ticker, "could not be found in the companies list.")
-            print("Try updating the list or checking your ticker input.")
-            raise e
+        company_info = self.get_company(ticker)
         # Try returning the MKK ID if it already exists
         try:
             return company_info['mkk_id']
@@ -108,11 +106,38 @@ class KAP():
             soup = BeautifulSoup(resp.text, 'html.parser')
             mkk_id = soup.select('img.comp-logo')[0]['src'].split('/')[-1]
             company_info['mkk_id'] = mkk_id
-            self.save_companies(companies)
+            self.save_company(company_info)
+            return mkk_id
 
     def get_price(self, ticker:str):
         query_ticker = ticker + self.query_suffix
         return self.yahoo_session.get_live_price(query_ticker)
+
+    def get_stats(self, ticker:str, online:bool=False):
+        if online:
+            query_ticker = ticker + self.query_suffix
+            return self.yahoo_session.get_stats(query_ticker)
+        else:
+            company_info = self.get_company(ticker)
+            # Try returning the stats if it already exists
+            try:
+                return company_info['stats']
+            # Get the stats from the Yahoo instead
+            except KeyError:
+                company_info['stats'] = self.get_stats(ticker, online=True)
+                self.save_company(company_info)
+                return company_info['stats']
+
+    def get_company(self, ticker:str, online:bool=False):
+        companies = self.get_companies(online=online)
+        # Try accessing the ticker
+        try:
+            company_info = companies[ticker]
+            return company_info
+        except KeyError as e:
+            print("Ticker", ticker, "could not be found in the companies list.")
+            print("Try updating the list or checking your ticker input.")
+            raise e
 
     def get_companies(self, online=False, save_results=True):
 
