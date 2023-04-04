@@ -7,6 +7,10 @@ import re
 import numpy as np
 import time
 import pandas as pd
+from yahooquery import Ticker
+import pickle as pk
+
+COMPANIES_FILE = "Companies.pickle"
 
 class KAP():
 
@@ -84,8 +88,8 @@ class KAP():
         return company_dict
 
     def save_companies(self, companies):
-        with open(self.data_path / 'Companies.json', 'w', encoding='utf-8') as f:
-            json.dump(companies, f, ensure_ascii=False, indent=2)
+        with open(self.data_path / COMPANIES_FILE, 'wb') as f:
+            pk.dump(companies, f)
     
     def save_company(self, company_dict):
         companies = self.get_companies()
@@ -109,24 +113,87 @@ class KAP():
             self.save_company(company_info)
             return mkk_id
 
-    def get_price(self, ticker:str):
         query_ticker = ticker + self.query_suffix
-        return self.yahoo_session.get_live_price(query_ticker)
+        ticker_obj = Ticker(query_ticker)
+        return ticker_obj.summary_detail
 
-    def get_stats(self, ticker:str, online:bool=False):
+    def get_yahoo_property(self, ticker:str, property:str, online:bool=False):
+        # Get the company info
+        company_info = self.get_company(ticker)
+        # Force online update here
         if online:
             query_ticker = ticker + self.query_suffix
-            return self.yahoo_session.get_stats(query_ticker)
+            query = Ticker(query_ticker)
+            # Exception is raised here if the property does not exist
+            company_info[property] = getattr(query, property)
+            self.save_company(company_info)
+            return company_info[property]
         else:
-            company_info = self.get_company(ticker)
             # Try returning the stats if it already exists
             try:
-                return company_info['stats']
+                return company_info[property]
             # Get the stats from the Yahoo instead
             except KeyError:
-                company_info['stats'] = self.get_stats(ticker, online=True)
-                self.save_company(company_info)
-                return company_info['stats']
+                return self.get_yahoo_property(ticker, property, online=True)
+
+    def get_price(self, ticker:str):
+        query_ticker = ticker + self.query_suffix
+        financial_data = self.get_yahoo_property(ticker, 'financial_data', online=True)
+        return financial_data[query_ticker]['currentPrice']
+
+    def get_balance_sheet(self, ticker:str, frequency='q', trailing=True, online:bool=False):
+        # Get the company info
+        company_info = self.get_company(ticker)
+        # Force online update here
+        if online:
+            query_ticker = ticker + self.query_suffix
+            query = Ticker(query_ticker)
+            company_info['balance_sheet'] = query.balance_sheet(frequency=frequency, trailing=trailing)
+            self.save_company(company_info)
+            return company_info['balance_sheet']
+        else:
+            # Try returning the balance_sheet if it already exists
+            try:
+                return company_info['balance_sheet']
+            # Get the balance_sheet from the Yahoo instead
+            except KeyError:
+                return self.get_balance_sheet(ticker, frequency=frequency, trailing=trailing, online=True)
+
+    def get_cash_flow(self, ticker:str, frequency='q', trailing=True, online:bool=False):
+        # Get the company info
+        company_info = self.get_company(ticker)
+        # Force online update here
+        if online:
+            query_ticker = ticker + self.query_suffix
+            query = Ticker(query_ticker)
+            company_info['cash_flow'] = query.cash_flow(frequency=frequency, trailing=trailing)
+            self.save_company(company_info)
+            return company_info['cash_flow']
+        else:
+            # Try returning the cash_flow if it already exists
+            try:
+                return company_info['cash_flow']
+            # Get the cash_flow from the Yahoo instead
+            except KeyError:
+                return self.get_cash_flow(ticker, frequency=frequency, trailing=trailing, online=True)
+            
+    def get_income_statement(self, ticker:str, frequency='q', trailing=True, online:bool=False):
+        # Get the company info
+        company_info = self.get_company(ticker)
+        # Force online update here
+        if online:
+            query_ticker = ticker + self.query_suffix
+            query = Ticker(query_ticker)
+            company_info['income_statement'] = query.income_statement(frequency=frequency, trailing=trailing)
+            self.save_company(company_info)
+            return company_info['income_statement']
+        else:
+            # Try returning the income_statement if it already exists
+            try:
+                return company_info['income_statement']
+            # Get the income_statement from the Yahoo instead
+            except KeyError:
+                return self.get_income_statement(ticker, frequency=frequency, trailing=trailing, online=True)
 
     def get_company(self, ticker:str, online:bool=False):
         companies = self.get_companies(online=online)
@@ -156,15 +223,15 @@ class KAP():
                 return self.companies
             # Try loading them from the saved file
             try:
-                with open(self.data_path / 'Companies.json', 'r', encoding='utf-8') as f:
-                    company_dict = json.load(f)
+                with open(self.data_path / COMPANIES_FILE, 'rb') as f:
+                    company_dict = pk.load(f)
             # If the file is not there, obtain it online
             except FileNotFoundError:
                 return self.get_companies(online=True, save_results=save_results)
         
         self.companies = company_dict
         return company_dict
-    
-    # TODO: Find a way to add Yahoo Finance data without affecting offline data loading
-    def __add_yahoo_data(self):
-        pass
+
+    def get_query_ticker(self, ticker):
+        return ticker + self.query_suffix
+

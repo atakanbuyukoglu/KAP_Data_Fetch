@@ -12,6 +12,8 @@ import math
 from pathlib import Path
 from fake_useragent import UserAgent
 
+####!!! OBSOLETE, WILL BE DELETED LATER !!! ####
+
 
 class YahooSession(requests.Session):
 
@@ -268,8 +270,8 @@ class YahooSession(requests.Session):
 
         json_str = html.split('root.App.main =')[1].split(
             '(this)')[0].split(';\n}')[0].strip()
-        data = json.loads(json_str)[
-            'context']['dispatcher']['stores']['QuoteSummaryStore']
+        json_data = json.loads(json_str)
+        data = json_data['context']['dispatcher']['stores']['QuoteSummaryStore']
 
         # return data
         new_data = json.dumps(data).replace('{}', 'null')

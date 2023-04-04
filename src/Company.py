@@ -16,21 +16,38 @@ class Company():
         # Update the info on the KAP database
         self.kap_website.update_companies(online=online)
         self.kap_website.add_mkk_id(ticker=self.ticker)
-        company_info = self.kap_website.get_companies()[self.ticker]
+        company_info = self.kap_website.get_company(self.ticker)
 
         # Return the company info
         return company_info
     
     def get_price(self):
         return self.kap_website.get_price(self.ticker)
-    
-    def get_stats(self):
         return self.kap_website.get_stats(self.ticker)
     
+    def get_balance_sheet(self):
+        return self.kap_website.get_balance_sheet(self.ticker)
+    
+    def get_latest_balance_sheet(self):
+        return self.get_balance_sheet().iloc[-1,:]
+    
+    def get_cash_flow(self):
+        return self.kap_website.get_cash_flow(self.ticker)
+    
+    def get_latest_cash_flow(self):
+        return self.get_cash_flow().iloc[-1,:]
+    
+    def get_income_statement(self):
+        return self.kap_website.get_income_statement(self.ticker)
+    
+    def get_latest_income_statement(self):
+        return self.get_income_statement().iloc[-1,:]
+    
+    
     def get_share_count(self):
-        stats = self.get_stats()
-        share_str = stats['Shares Outstanding 5']
-        share_count = Company.__value_to_float(share_str)
+        query_ticker = self.kap_website.get_query_ticker(self.ticker)
+        stats = self.key_stats[query_ticker]
+        share_count = stats['sharesOutstanding']
 
         return share_count
     
@@ -39,19 +56,15 @@ class Company():
         price = self.get_price()
         return share_count * price
     
-    def get_enterprise_value(self):
-        stats = self.get_stats()
-        # Get approximate values from Yahoo for net debt
-        market_cap_yahoo = Company.__value_to_float(stats['Market Cap (intraday)'])
-        enterprise_value_yahoo = Company.__value_to_float(stats['Enterprise Value'])
-        net_debt = enterprise_value_yahoo - market_cap_yahoo
+    def get_net_debt(self):
+        return self.get_latest_balance_sheet()['NetDebt']
 
-        enterprise_value = self.get_market_cap() + net_debt
-        return enterprise_value
+    def get_enterprise_value(self):
+        return self.get_market_cap() + self.get_net_debt()
 
     def get_ebitda(self):
-        stats = self.get_stats()
-        ebitda = Company.__value_to_float(stats['EBITDA'])
+        income_statement = self.get_latest_income_statement()
+        ebitda = income_statement['EBITDA']
         return ebitda
     
     def get_ev_ebitda(self):
@@ -80,10 +93,12 @@ class Company():
         company_info =  object.__getattribute__(self, "company_info")
         try:
             return company_info[name]
+        # Try updating the KAP data
         except KeyError:
             company_info = self.update_info()
         try:
             return company_info[name]
+        # Try updating the Yahoo data
         except KeyError as e:
-            print('No attribute with', name, 'in company', company_info['ticker'], 'found.')
-            raise e
+            company_info[name] = self.kap_website.get_yahoo_property(self.ticker, name)
+            return company_info[name]
