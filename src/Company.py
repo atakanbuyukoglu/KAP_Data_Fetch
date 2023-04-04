@@ -25,9 +25,17 @@ class Company():
         return self.kap_website.get_price(self.ticker)
         return self.kap_website.get_stats(self.ticker)
     
-    def get_balance_sheet(self):
-        return self.kap_website.get_balance_sheet(self.ticker)
+    def get_balance_sheet(self, online=False):
+        return self.kap_website.get_balance_sheet(self.ticker, online=False)
     
+    # TODO: Implement a way to approximate next earnings date
+    def get_next_earnings_date():
+        raise NotImplementedError
+    
+    # TODO: Get the historical prices from yahooquery
+    def get_historical_prices():
+        raise NotImplementedError
+
     def get_latest_balance_sheet(self):
         return self.get_balance_sheet().iloc[-1,:]
     
@@ -42,7 +50,6 @@ class Company():
     
     def get_latest_income_statement(self):
         return self.get_income_statement().iloc[-1,:]
-    
     
     def get_share_count(self):
         query_ticker = self.kap_website.get_query_ticker(self.ticker)
@@ -64,30 +71,30 @@ class Company():
 
     def get_ebitda(self):
         income_statement = self.get_latest_income_statement()
-        ebitda = income_statement['EBITDA']
-        return ebitda
+        return income_statement['EBITDA']
     
+    def get_ebit(self):
+        income_statement = self.get_latest_income_statement()
+        return income_statement['EBIT']
+    
+    def get_net_income(self):
+        income_statement = self.get_latest_income_statement()
+        return income_statement['NetIncomeCommonStockholders']
+    
+    def get_net_income_all(self):
+        income_statement = self.get_latest_income_statement()
+        return income_statement['NetIncome']
+    
+    ### Ratios ###
     def get_ev_ebitda(self):
         return self.get_enterprise_value() / self.get_ebitda()
 
-    @staticmethod
-    def __value_to_float(x):
-        if type(x) == float or type(x) == int:
-            return x
-        if 'K' in x:
-            if len(x) > 1:
-                return float(x.replace('K', '')) * 1e3
-            return 1e3
-        if 'M' in x:
-            if len(x) > 1:
-                return float(x.replace('M', '')) * 1e6
-            return 1e6
-        if 'B' in x:
-            if len(x) > 1:
-                return float(x.replace('B', '')) * 1e9
-            return 1e9
-        return float(x)
-        
+    def get_price_earnings(self):
+        return self.get_market_cap() / self.get_net_income()
+
+    def get_pe_ratio(self):
+        return self.get_price_earnings()
+
     # Get attributes from company_dict
     def __getattr__(self, name):
         company_info =  object.__getattribute__(self, "company_info")
