@@ -14,7 +14,7 @@ class Company():
 
     def update_info(self, online=True):
         # Update the info on the KAP database
-        self.kap_website.update_companies(online=online)
+        self.kap_website.update_companies(self.ticker, online=online)
         self.kap_website.add_mkk_id(ticker=self.ticker)
         company_info = self.kap_website.get_company(self.ticker)
 

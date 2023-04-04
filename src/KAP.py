@@ -58,7 +58,7 @@ class KAP():
 
         return html_list
 
-    def __html_list_to_company_dict(self, html_list, save_results=True):
+    def __html_list_to_company_dict(self, html_list, old_company_dict=None, save_results=True):
         # Load the constants
         with open(self.constants_path, 'r') as f:
             constants = json.load(f)
@@ -80,6 +80,12 @@ class KAP():
             kap_id = int(re.search(r'\d+', link).group())
             ticker_dict['kap_id'] = kap_id
 
+            # Add values from old list if there are any#
+            if old_company_dict is not None and ticker in old_company_dict:
+                for old_key, old_value in old_company_dict[ticker].items():
+                    if old_key not in ticker_dict:
+                        ticker_dict[old_key] = old_value
+
             company_dict[ticker] = ticker_dict
         
         if save_results:
@@ -96,7 +102,13 @@ class KAP():
         companies[company_dict['ticker']] = company_dict
         self.save_companies(companies)
 
-    def update_companies(self, online=True):
+    def update_companies(self, ticker, online=True):
+        if online:
+            # Update all financial information regarding the ticker
+            self.get_balance_sheet(ticker)
+            self.get_income_statement(ticker)
+            self.get_cash_flow(ticker)
+        # Return an updated list of companies
         return self.get_companies(online=online)
 
     def add_mkk_id(self, ticker:str):
@@ -209,6 +221,18 @@ class KAP():
     def get_companies(self, online=False, save_results=True):
 
         if online:
+            # Get the old version of companies
+            # Get it from the saved varible if possible
+            if self.companies is not None:
+                companies_old = self.companies
+            # If not there, try loading them from the saved file
+            else:
+                try:
+                    with open(self.data_path / COMPANIES_FILE, 'rb') as f:
+                        companies_old = pk.load(f)
+                except FileNotFoundError:
+                    companies_old = None
+            
             # Get the raw HTML response from KAP
             raw_response = self.__get_company_list_html()
 
@@ -216,21 +240,22 @@ class KAP():
             html_list = self.__raw_html_to_html_list(raw_response)
             
             # Convert the results to a dictionary
-            company_dict = self.__html_list_to_company_dict(html_list, save_results=save_results)
+            companies = self.__html_list_to_company_dict(html_list, old_company_dict=companies_old,
+                                                            save_results=save_results)
         else:
-            # Get it from the saved varible if possible
+            # Get it from the saved variable if possible
             if self.companies is not None:
                 return self.companies
             # Try loading them from the saved file
             try:
                 with open(self.data_path / COMPANIES_FILE, 'rb') as f:
-                    company_dict = pk.load(f)
+                    companies = pk.load(f)
             # If the file is not there, obtain it online
             except FileNotFoundError:
                 return self.get_companies(online=True, save_results=save_results)
         
-        self.companies = company_dict
-        return company_dict
+        self.companies = companies
+        return companies
 
     def get_query_ticker(self, ticker):
         return ticker + self.query_suffix
