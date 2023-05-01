@@ -1,6 +1,7 @@
 from .KAP import KAP
 import yfinance as yf
 import numpy as np
+import pandas as pd
 
 
 class Company():
@@ -15,7 +16,7 @@ class Company():
     def update_info(self, online=True):
         # Update the info on the KAP database
         self.kap_website.update_companies(self.ticker, online=online)
-        self.kap_website.add_mkk_id(ticker=self.ticker)
+        self.kap_website.get_mkk_id(ticker=self.ticker)
         company_info = self.kap_website.get_company(self.ticker)
 
         # Return the company info
@@ -26,7 +27,10 @@ class Company():
         return self.kap_website.get_stats(self.ticker)
     
     def get_balance_sheet(self, online=False):
-        return self.kap_website.get_balance_sheet(self.ticker, online=False)
+        balance_sheet = self.kap_website.get_balance_sheet(self.ticker, online=online)
+        if isinstance(balance_sheet, str) and 'unavailable' in balance_sheet:
+            raise ValueError(balance_sheet)
+        return balance_sheet
     
     # TODO: Implement a way to approximate next earnings date
     def get_next_earnings_date():
@@ -37,7 +41,8 @@ class Company():
         raise NotImplementedError
 
     def get_latest_balance_sheet(self):
-        return self.get_balance_sheet().iloc[-1,:]
+        balance_sheet = self.get_balance_sheet()
+        return balance_sheet.iloc[-1,:]
     
     def get_cash_flow(self):
         return self.kap_website.get_cash_flow(self.ticker)
@@ -64,7 +69,8 @@ class Company():
         return share_count * price
     
     def get_net_debt(self):
-        return self.get_latest_balance_sheet()['NetDebt']
+        balance_sheet = self.get_latest_balance_sheet()
+        return balance_sheet['NetDebt']
 
     def get_enterprise_value(self):
         return self.get_market_cap() + self.get_net_debt()

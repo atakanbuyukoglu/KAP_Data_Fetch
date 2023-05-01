@@ -111,7 +111,7 @@ class KAP():
         # Return an updated list of companies
         return self.get_companies(online=online)
 
-    def add_mkk_id(self, ticker:str):
+    def get_mkk_id(self, ticker:str):
         company_info = self.get_company(ticker)
         # Try returning the MKK ID if it already exists
         try:
