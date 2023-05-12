@@ -9,9 +9,16 @@ import time
 import pandas as pd
 from yahooquery import Ticker
 import pickle as pk
+from openpyxl import Workbook
+from openpyxl.utils.dataframe import dataframe_to_rows
+from openpyxl.worksheet.properties import WorksheetProperties, PageSetupProperties
+
 
 COMPANIES_FILE = "Companies.pickle"
+COMPANIES_PATH = Path(__file__).parents[1] / 'Data' / 'Companies'
+COMPANIES_PATH.mkdir(parents=True, exist_ok=True)
 
+# TODO: Store All Values in CSV files instead of pickle
 class KAP():
 
     def __init__(self) -> None:
@@ -101,6 +108,26 @@ class KAP():
         companies = self.get_companies()
         companies[company_dict['ticker']] = company_dict
         self.save_companies(companies)
+        # Save to the Excel files
+        wb = Workbook()
+        ws_info = wb.active
+        ws_info.title = 'Info'
+        ws_info.sheet_properties.best_fit = True
+        company_ticker = company_dict['ticker']
+        for company_key, company_value in company_dict.items():
+            if isinstance(company_value, pd.DataFrame):
+                ws_df = wb.create_sheet(company_key.upper())
+                for row in dataframe_to_rows(company_value, index=True, header=True):
+                    ws_df.append(row)
+            elif isinstance(company_value, dict):
+                stats = company_value[(company_ticker + self.query_suffix)]
+                ws_stats = wb.create_sheet(company_key.upper())
+                for stat, value in stats.items():
+                    ws_stats.append([stat, value])
+            else:
+                ws_info.append([company_key, company_value])
+
+        wb.save(COMPANIES_PATH / (company_ticker + '.xlsx'))
 
     def update_companies(self, ticker, online=True):
         if online:

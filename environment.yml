@@ -6,3 +6,4 @@ dependencies:
   - pathlib
   - beautifulsoup4
   - pip
+  - openpyxl

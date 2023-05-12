@@ -1,6 +1,7 @@
 from src.Company import Company
 import numpy as np
 
+# TODO: Add P/E Valuation
 def ebitda_val(company:Company, growth_rate, discount_rate):
     # Calculate the coefficient from growth/discount rates
     assert growth_rate < discount_rate, 'The growth Rate for the DCF must be less than the discount rate'

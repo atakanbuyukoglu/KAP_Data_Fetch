@@ -12,6 +12,7 @@ class Company():
         # Initialize the info for the KAP website
         self.kap_website = KAP()
         self.company_info = self.update_info(online=False)
+        self.kap_website.save_company(self.company_info)
 
     def update_info(self, online=True):
         # Update the info on the KAP database
@@ -115,3 +116,12 @@ class Company():
         except KeyError as e:
             company_info[name] = self.kap_website.get_yahoo_property(self.ticker, name)
             return company_info[name]
+
+class CompanyDataSet():
+
+    def __init__(self, file_path) -> None:
+        self.companies = []
+        self.file_path = file_path
+
+    def add_company(self, company: Company):
+        self.companies.append(company)
