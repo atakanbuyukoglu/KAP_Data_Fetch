@@ -10,6 +10,7 @@ import pandas as pd
 from yahooquery import Ticker
 import pickle as pk
 from openpyxl import Workbook
+from openpyxl.reader.excel import load_workbook
 from openpyxl.utils.dataframe import dataframe_to_rows
 from openpyxl.worksheet.properties import WorksheetProperties, PageSetupProperties
 
@@ -129,6 +130,48 @@ class KAP():
 
         wb.save(COMPANIES_PATH / (company_ticker + '.xlsx'))
 
+    # TODO: Load company data from XLSX files
+    def load_company(self, ticker, online=False):
+        ticker = ticker.upper()
+        company_info = {}
+        # Load the company info from the xlsx file
+        company_path = COMPANIES_PATH / (ticker + '.xlsx')
+        wb = load_workbook(company_path)
+        # The Info worksheet
+        ws_info = wb.get_sheet_by_name('Info')
+        for r in ws_info.rows:
+            company_info[r[0].value] = r[1].value
+        # The stats worksheet
+        ws_stats = wb.get_sheet_by_name('KEY_STATS')
+        stats_ticker = ticker + self.query_suffix
+        stats_ticker_dict = {}
+        for r in ws_stats.rows:
+            stats_ticker_dict[r[0].value] = r[1].value
+        stats_dict = {stats_ticker : stats_ticker_dict}
+        company_info['key_stats'] = stats_dict
+        # The financial information worksheets
+        raise NotImplementedError
+
+        return company_info
+
+    def update_company(self, ticker, online=True):
+        # Get the company dictionary
+        company_info = self.get_company(ticker)
+        mkk_id = self.get_mkk_id(ticker)
+        if online:
+            # Load the report indices
+            company_filter_site = self.constants['sites']['filter_site']
+            company_filter_site += '/' + mkk_id + '/FR/365'
+            reports_text = self.r.get(company_filter_site)
+            reports_json = json.loads(reports_text.text)
+            # Filter the financial reports
+            reports_financial = [report for report in reports_json if report['basic']['disclosureCategory'] == 'FR']
+            report_indices = [report['basic']['disclosureIndex'] for report in reports_financial]
+            company_info['report_indices'] = report_indices
+
+        return company_info
+
+    
     def update_companies(self, ticker, online=True):
         if online:
             # Update all financial information regarding the ticker
@@ -180,6 +223,7 @@ class KAP():
         financial_data = self.get_yahoo_property(ticker, 'financial_data', online=True)
         return financial_data[query_ticker]['currentPrice']
 
+    # TODO: Get these info from KAP
     def get_balance_sheet(self, ticker:str, frequency='q', trailing=True, online:bool=False):
         # Get the company info
         company_info = self.get_company(ticker)
@@ -234,15 +278,29 @@ class KAP():
             except KeyError:
                 return self.get_income_statement(ticker, frequency=frequency, trailing=trailing, online=True)
 
+    def get_balance_sheet_kap(self, ticker:str, frequency='q', trailing=True, online:bool=False):
+        mkk_id = self.get_mkk_id(ticker)
+        if online:
+            # Load the report indices
+            company_filter_site = self.constants['sites']['filter_site']
+            company_filter_site += '/' + mkk_id + '/FR/365'
+            reports_text = self.r.get(company_filter_site)
+            reports_json = json.loads(reports_text.text)
+            # Filter the financial reports
+            reports_financial = [report for report in reports_json if report['basic']['disclosureCategory'] == 'FR']
+            report_indices = [report['basic']['disclosureIndex'] for report in reports_financial]
+            
+
     def get_company(self, ticker:str, online:bool=False):
         companies = self.get_companies(online=online)
+        if ticker not in companies:
+            companies = self.get_companies(online=True)
         # Try accessing the ticker
         try:
             company_info = companies[ticker]
             return company_info
         except KeyError as e:
             print("Ticker", ticker, "could not be found in the companies list.")
-            print("Try updating the list or checking your ticker input.")
             raise e
 
     def get_companies(self, online=False, save_results=True):
